@@ -1,0 +1,29 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Manim / local outputs
+media/
+output/
+*.tmp.mp4
+.partial_movie_files/
+partial_movie_files/
+
+# Fetched working data (examples/ kept for --sample)
+data/raw_fflow/
+data/concept_fflow_major.json
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local helpers
+_copy_samples.py
