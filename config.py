@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -42,8 +43,19 @@ PIXEL_HEIGHT = 2560
 # 默认 30fps：画面内容不变，渲染帧数约减半（要更丝滑用 run.py --smooth → 60）
 FRAME_RATE = int(os.environ.get("FUND_FLOW_FPS", "30"))
 
-# Chinese font — change if missing on your OS
-CN_FONT = os.environ.get("FUND_FLOW_CN_FONT", "Microsoft YaHei")
+def default_cn_font() -> str:
+    env = os.environ.get("FUND_FLOW_CN_FONT", "").strip()
+    if env:
+        return env
+    if sys.platform == "darwin":
+        return "PingFang SC"
+    if sys.platform.startswith("linux"):
+        return "Noto Sans CJK SC"
+    return "Microsoft YaHei"
+
+
+# Chinese font — auto by OS; override with FUND_FLOW_CN_FONT
+CN_FONT = default_cn_font()
 
 # BGM mix
 BGM_VOLUME = 0.55

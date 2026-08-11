@@ -13,45 +13,60 @@
 
 ## 需要准备
 
-| 项目 | 说明 |
-|------|------|
-| OS | Windows 10/11（推荐），macOS / Linux 也可 |
-| Python | **3.10+**（安装时勾选 Add to PATH） |
-| FFmpeg | 命令行可运行 `ffmpeg` / `ffprobe` → [下载](https://ffmpeg.org/download.html) |
-| 字体 | Windows：微软雅黑；macOS 可设 `FUND_FLOW_CN_FONT=PingFang SC` |
+| 项目 | Windows | macOS |
+|------|---------|--------|
+| Python | 3.10+（勾选 Add to PATH） | `brew install python` 或官网安装 3.10+ |
+| FFmpeg | [下载](https://ffmpeg.org/download.html) 并加入 PATH | `brew install ffmpeg` |
+| 字体 | 微软雅黑（系统自带） | 自动用 **PingFang SC**（苹方） |
+| 可选 | — | 若 Manim 缺系统库：`brew install pkg-config cairo pango` |
+
+没有 Homebrew？先装：https://brew.sh
 
 ---
 
 ## 快速开始
 
-### Windows（最简单）
-
-1. Clone 本仓库并进入目录  
-2. 双击 **`一键生成.bat`**（首次自动建虚拟环境并装依赖）  
-3. 成片在 `output/<交易日>/FundFlowOverlay_<真实日期>_<时刻>.mp4`
-
-### 命令行（全平台）
+### macOS
 
 ```bash
+# 1) 依赖（只需做一次）
+brew install python ffmpeg pkg-config cairo pango
+
+# 2) 下载项目
 git clone https://github.com/Xiangyahaian/ConceptFlow.git
 cd ConceptFlow
 
-python -m venv .venv
+# 3) 首次给脚本执行权限，然后双击「一键生成.command」
+#    或在终端：
+chmod +x 一键生成.command 切换BGM.command
+./一键生成.command
+```
 
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-# source .venv/bin/activate
+终端等价写法：
 
+```bash
+cd ConceptFlow
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 
-# 先用不联网案例验证环境（约几分钟，低清更快可加 --ql）
+# 先离线低清试跑（推荐第一次）
 python run.py --sample --ql --yes
 
-# 拉最新交易日数据并出 2K 成片（默认 30fps）
+# 拉最新数据出 2K 成片
 python run.py --yes
 ```
 
+成片在：`output/<交易日>/FundFlowOverlay_<真实日期>_<时刻>.mp4`
+
+> Finder 里若双击 `.command` 提示无权限：在终端对项目目录执行一次  
+> `chmod +x 一键生成.command 切换BGM.command`
+
+### Windows
+
+1. Clone 本仓库并进入目录  
+2. 双击 **`一键生成.bat`**（首次自动建虚拟环境并装依赖）  
+3. 成片同样在 `output/<交易日>/`
 ---
 
 ## 常用命令
@@ -73,9 +88,9 @@ python run.py --force-fetch   # 强制重新下载 API 数据
 
 当前使用的文件：`assets/bgm.mp3`
 
-1. 打开 `assets/`（或双击 `切换BGM.bat`）  
+1. 打开 `assets/`（Windows：`切换BGM.bat` / macOS：`切换BGM.command`）  
 2. 用你的 mp3 **覆盖** `bgm.mp3`  
-3. 再运行 `python run.py`
+3. 再运行 `python run.py` 或一键脚本
 
 备选歌曲可放在 `assets/bgm_library/`。
 
@@ -88,7 +103,8 @@ ConceptFlow/
   run.py                 # 主入口
   boards.json            # 跟踪的约 36 个概念板块
   requirements.txt
-  一键生成.bat            # Windows 一键
+  一键生成.bat / .command # Windows / macOS 一键
+  切换BGM.bat / .command  # 打开 assets 换歌
   assets/bgm.mp3         # 默认背景音乐
   scenes/                # Manim 场景
   src/                   # 拉数 / 打包 / 配乐 / 日期检查
@@ -131,12 +147,20 @@ boards.json
 **拉数失败 / 连接断开**  
 东财接口偶发拒连。多试几次或换网络；也可先 `python run.py --sample` 验证渲染链路。
 
-**中文变方框**  
-缺少中文字体。macOS 示例：
+**中文变方框（macOS）**  
+默认已用苹方。若仍异常可手动指定：
 
 ```bash
 export FUND_FLOW_CN_FONT="PingFang SC"
+# 或: export FUND_FLOW_CN_FONT="Heiti SC"
 python run.py --sample --ql --yes
+```
+
+**macOS 安装 manim 报错缺 cairo**  
+
+```bash
+brew install pkg-config cairo pango ffmpeg
+pip install -r requirements.txt
 ```
 
 **渲染慢**  

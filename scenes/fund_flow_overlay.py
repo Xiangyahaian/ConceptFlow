@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -19,7 +20,20 @@ config.frame_height = 16
 _ROOT = Path(__file__).resolve().parents[1]
 _DEFAULT_DATA = _ROOT / "data" / "concept_fflow_major.json"
 DATA = Path(os.environ.get("FUND_FLOW_DATA", str(_DEFAULT_DATA)))
-CN_FONT = os.environ.get("FUND_FLOW_CN_FONT", "Microsoft YaHei")
+
+
+def _cn_font() -> str:
+    env = os.environ.get("FUND_FLOW_CN_FONT", "").strip()
+    if env:
+        return env
+    if sys.platform == "darwin":
+        return "PingFang SC"
+    if sys.platform.startswith("linux"):
+        return "Noto Sans CJK SC"
+    return "Microsoft YaHei"
+
+
+CN_FONT = _cn_font()
 
 FRAME_W = 8.4
 FRAME_H = 13.5
