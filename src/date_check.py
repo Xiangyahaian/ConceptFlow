@@ -67,13 +67,16 @@ def confirm_use_data(
         return True
 
     if assume_yes:
-        print("[date] --yes：自动使用当前数据继续。")
+        print(
+            f"[date] --yes：继续使用交易日 {data_date.isoformat()} "
+            f"（点数 {n_points}）生成视频。"
+        )
         return True
 
     if data_date != today:
         prompt = (
-            f"今日最新数据似乎还没出来。是否使用 {data_date.isoformat()} 的数据生成视频？"
-            f" [Y/n] "
+            f"接口仍是 {data_date.isoformat()}（不是今天 {today.isoformat()}）。"
+            f"是否用这份数据生成视频？ [Y/n] "
         )
     else:
         prompt = (

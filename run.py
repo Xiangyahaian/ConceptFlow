@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import date as calendar_date
 from pathlib import Path
 
 # Ensure project root on sys.path
@@ -42,6 +43,7 @@ from src.build_data import build_pack  # noqa: E402
 from src.date_check import confirm_use_data  # noqa: E402
 from src.fetch import (  # noqa: E402
     download_boards_fflow,
+    download_market_fflow,
     load_boards,
     peek_data_date,
     peek_point_count,
@@ -120,8 +122,15 @@ def render_video(quality: str, fps: int) -> Path:
         "FundFlowOverlay",
     ]
     print("[render]", " ".join(cmd))
-    est = "约 8–18 分钟" if fps <= 30 else "约 15–30 分钟"
-    print(f"[render] 2K（1440×2560 @{fps}fps），{est}，请耐心等待…")
+    pw = int(env.get("FUND_FLOW_PIXEL_WIDTH", "1440"))
+    ph = int(env.get("FUND_FLOW_PIXEL_HEIGHT", "2560"))
+    if pw * ph >= 2160 * 3840:
+        est = "约 40–90 分钟"
+    elif fps > 30:
+        est = "约 15–30 分钟"
+    else:
+        est = "约 8–18 分钟"
+    print(f"[render] {pw}×{ph} @{fps}fps，{est}，请耐心等待…")
     subprocess.run(cmd, check=True, cwd=str(ROOT), env=env)
 
     # Manim CE names folder by pixel_height + fps, e.g. 2560p60
@@ -139,7 +148,16 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="生成概念板块主力资金流向竖屏视频")
     ap.add_argument("--sample", action="store_true", help="使用内置 2026-08-10 案例，不联网")
     ap.add_argument("--yes", "-y", action="store_true", help="日期不符时不询问，直接继续")
-    ap.add_argument("--force-fetch", action="store_true", help="强制重新下载（忽略本地缓存）")
+    ap.add_argument(
+        "--force-fetch",
+        action="store_true",
+        help="强制重新下载全部板块（忽略本地缓存）",
+    )
+    ap.add_argument(
+        "--use-cache",
+        action="store_true",
+        help="沿用旧缓存策略：本地 JSON 合法就跳过（可能卡住旧交易日，不推荐）",
+    )
     ap.add_argument("--no-render", action="store_true", help="只拉数/打包，不渲染")
     ap.add_argument("--no-bgm", action="store_true", help="不混合背景音乐")
     ap.add_argument(
@@ -150,11 +168,16 @@ def main() -> int:
     )
     ap.add_argument("--list-bgm", action="store_true", help="列出 assets/bgm 曲库后退出")
     ap.add_argument("--ql", action="store_true", help="低清快速预览")
-    ap.add_argument("--qh", action="store_true", help="高清（默认）")
+    ap.add_argument("--qh", action="store_true", help="高清 2K（默认）")
+    ap.add_argument(
+        "--qk",
+        action="store_true",
+        help="最高画质：竖屏 4K（2160×3840）+ 60fps",
+    )
     ap.add_argument(
         "--smooth",
         action="store_true",
-        help="60fps（更丝滑，渲染约慢一倍；默认 30fps）",
+        help="60fps（更丝滑，渲染约慢一倍；默认 30fps；--qk 已含）",
     )
     ap.add_argument(
         "--keep-silent",
@@ -178,13 +201,39 @@ def main() -> int:
 
     if args.sample:
         use_sample_data()
-        # rebuild pack from sample raw so title/date stay consistent
+        # 案例板块可离线；大盘摘要尽量拉最新（失败则底部用占位）
+        print("[fetch] 拉取大盘（沪深两市）主力净流入…")
+        download_market_fflow(RAW_DIR, force=True, min_full=MIN_POINTS_FULL_DAY)
         pack = build_pack(boards, RAW_DIR, PACK_FILE)
     else:
+        cached_date = peek_data_date(RAW_DIR)
+        cached_pts = peek_point_count(RAW_DIR)
+        if cached_date:
+            print(
+                f"[fetch] 本地缓存: 交易日={cached_date} 点数≈{cached_pts} "
+                f"（日历今天={calendar_date.today().isoformat()}）"
+            )
+            if cached_date != calendar_date.today().isoformat() and not args.use_cache:
+                print(
+                    "[fetch] 缓存不是今天的完整行情 → 将自动重新拉取"
+                    "（不再 silent skip 旧文件）"
+                )
         print("[fetch] 正在从东方财富拉取分时主力净流入…")
         ok, failed = download_boards_fflow(
-            boards, RAW_DIR, force=args.force_fetch
+            boards,
+            RAW_DIR,
+            force=args.force_fetch,
+            use_cache=args.use_cache,
+            min_full=MIN_POINTS_FULL_DAY,
         )
+        print("[fetch] 拉取大盘（沪深两市）主力净流入…")
+        if not download_market_fflow(
+            RAW_DIR,
+            force=args.force_fetch,
+            use_cache=args.use_cache,
+            min_full=MIN_POINTS_FULL_DAY,
+        ):
+            print("[fetch] 警告: 大盘拉取失败，底部摘要可能缺失。")
         if len(ok) < max(8, len(boards) // 2):
             print(
                 f"\n[fetch] 成功过少（{len(ok)}/{len(boards)}）。\n"
@@ -224,8 +273,20 @@ def main() -> int:
         print(f"  归档数据: {pack_archive}")
         return 0
 
-    quality = "-ql" if args.ql else "-qh"
-    fps = 60 if args.smooth else FRAME_RATE
+    if args.ql:
+        quality = "-ql"
+        fps = FRAME_RATE
+    elif args.qk:
+        quality = "-qk"
+        fps = 60
+        # 竖屏 4K；场景模块读取这些环境变量覆盖默认 2K
+        os.environ["FUND_FLOW_PIXEL_WIDTH"] = "2160"
+        os.environ["FUND_FLOW_PIXEL_HEIGHT"] = "3840"
+        os.environ["FUND_FLOW_FPS"] = "60"
+        print("[render] 最高画质：2160×3840 @ 60fps")
+    else:
+        quality = "-qh"
+        fps = 60 if args.smooth else FRAME_RATE
     silent = render_video(quality, fps=fps)
     stem = video_stem()  # e.g. FundFlowOverlay_2026-08-11_124630（产出真实日期+时刻）
     final_out = day_dir / f"{stem}.mp4"
